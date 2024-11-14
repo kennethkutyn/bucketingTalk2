@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MurmurHash v3 Example</title>
+</head>
+<body>
+    <h1>MurmurHash v3 to Int Between 1 and 100</h1>
+    
+
+    <p> Experiment 1</p>
+    <input type="text" id="inputString1" placeholder="User ID"> <input type="text" id="bucketingSalt1" placeholder="Bucketing Salt">
+    <br>
+    <br>
+    <p> Experiment 2</p>
+    <input type="text" id="inputString2" placeholder="User ID"> <input type="text" id="bucketingSalt2" placeholder="Bucketing Salt">
+    <br>
+    <br>
+    <button onclick="generateHash()">Generate Hash</button>
+    
+    <p>Hash Value (1 to 100): <span id="hashResult1"></span></p>
+    <p>Hash Value (1 to 100): <span id="hashResult2"></span></p>
+    
+    <script>
+        // Define your Amplitude API key
+        const AMPLITUDE_API_KEY = '0e8422e8d933b058773da0847b0d8290';
+
+// Function to send an event to Amplitude
+function sendEvent(eventType, userId, eventProperties = {}) {
+    const event = {
+        api_key: AMPLITUDE_API_KEY,
+        events: [
+            {
+                user_id: userId,
+                event_type: eventType,
+                event_properties: eventProperties,
+                time: Date.now(), // Optional: Timestamp in milliseconds
+            },
+        ],
+    };
+
+    // Send the event using fetch
+    fetch('https://api.amplitude.com/2/httpapi', {  // Corrected endpoint
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Event sent successfully:', data);
+        })
+        .catch(error => {
+            console.error('Error sending event:', error);
+        });
+}
+            
+       
+       // MurmurHash3 JS implementation (x86 32-bit version)
+        function murmurhash3_32_gc(key, seed) {
+            var remainder, bytes, h1, h1b, c1, c2, k1, i;
+            
+            remainder = key.length & 3; // key.length % 4
+            bytes = key.length - remainder;
+            h1 = seed;
+            c1 = 0xcc9e2d51;
+            c2 = 0x1b873593;
+            i = 0;
+
+            while (i < bytes) {
+                k1 = 
+                  ((key.charCodeAt(i) & 0xff)) |
+                  ((key.charCodeAt(++i) & 0xff) << 8) |
+                  ((key.charCodeAt(++i) & 0xff) << 16) |
+                  ((key.charCodeAt(++i) & 0xff) << 24);
+                ++i;
+                
+                k1 = (((k1 & 0xffff) * c1) + ((((k1 >>> 16) * c1) & 0xffff) << 16)) & 0xffffffff;
+                k1 = (k1 << 15) | (k1 >>> 17);
+                k1 = (((k1 & 0xffff) * c2) + ((((k1 >>> 16) * c2) & 0xffff) << 16)) & 0xffffffff;
+
+                h1 ^= k1;
+                h1 = (h1 << 13) | (h1 >>> 19);
+                h1b = (((h1 & 0xffff) * 5) + ((((h1 >>> 16) * 5) & 0xffff) << 16)) & 0xffffffff;
+                h1 = (((h1b & 0xffff) + 0x6b64) + ((((h1b >>> 16) + 0xe654) & 0xffff) << 16));
+            }
+
+            k1 = 0;
+
+            switch (remainder) {
+                case 3: k1 ^= (key.charCodeAt(i + 2) & 0xff) << 16;
+                case 2: k1 ^= (key.charCodeAt(i + 1) & 0xff) << 8;
+                case 1: k1 ^= (key.charCodeAt(i) & 0xff);
+
+                k1 = (((k1 & 0xffff) * c1) + ((((k1 >>> 16) * c1) & 0xffff) << 16)) & 0xffffffff;
+                k1 = (k1 << 15) | (k1 >>> 17);
+                k1 = (((k1 & 0xffff) * c2) + ((((k1 >>> 16) * c2) & 0xffff) << 16)) & 0xffffffff;
+                h1 ^= k1;
+            }
+
+            h1 ^= key.length;
+
+            h1 ^= h1 >>> 16;
+            h1 = (((h1 & 0xffff) * 0x85ebca6b) + ((((h1 >>> 16) * 0x85ebca6b) & 0xffff) << 16)) & 0xffffffff;
+            h1 ^= h1 >>> 13;
+            h1 = (((h1 & 0xffff) * 0xc2b2ae35) + ((((h1 >>> 16) * 0xc2b2ae35) & 0xffff) << 16)) & 0xffffffff;
+            h1 ^= h1 >>> 16;
+
+            return h1 >>> 0;
+        }
+
+        function generateHash() {
+            const inputString1 = document.getElementById('inputString1').value + document.getElementById('bucketingSalt1').value;
+            const inputString2 = document.getElementById('inputString2').value + document.getElementById('bucketingSalt2').value;
+            // Generate a 32-bit hash using the local MurmurHash3 implementation
+            const hash321 = murmurhash3_32_gc(inputString1, 0);
+            const hash322 = murmurhash3_32_gc(inputString2, 0);
+
+            // Scale the hash value to be between 1 and 100
+            const hashInRange1 = (Math.abs(hash321) % 100) + 1;
+            const hashInRange2 = (Math.abs(hash322) % 100) + 1;
+
+            // Display the result
+            document.getElementById('hashResult1').textContent = hashInRange1;
+            document.getElementById('hashResult2').textContent = hashInRange2;
+            sendEvent('Hash Generated', 'user123', { hashValue: hashInRange1 });
+            sendEvent('Hash Generated', 'user123', { hashValue: hashInRange2 });
+        }
+
+            
+    </script>
+</body>
+</html>
